@@ -38,13 +38,16 @@ SwiftUI 写的，不依赖 iSH，也不是把 Node 塞进 App。
 
 ## 安装（unsigned IPA）
 
-CI 的 **Unsigned IPA** 工作流会产出 `Dsh-unsigned.ipa`：
+每次构建成功都会直接发到 **Releases**：
 
-1. 打开 Actions → 最近一次 `Unsigned IPA` → Artifacts → 下载 `dsh-unsigned-ipa`。
+**下载地址**：<https://github.com/qweQ-1/dsh-ios/releases/download/dsh-latest/Dsh-unsigned.ipa>
+
+1. 用 iPhone Safari 打开上面的链接下载（或从 [Releases 页面](https://github.com/qweQ-1/dsh-ios/releases) 进）。
 2. 用 **AltStore / Sideloadly / 轻松签** 等自签工具装入 iPhone（免费 Apple ID 即可，7 天有效期）。
 3. 第一次启动去 **设置** 填 DeepSeek API Key（[获取地址](https://platform.deepseek.com/api_keys)）。
 
 > 没有签名的 IPA 不能直接双击安装，必须有自签工具或开发者证书。
+> Actions 里的 `dsh-unsigned-ipa` artifact 也会保留一份，作为备用下载。
 
 ## 使用
 
