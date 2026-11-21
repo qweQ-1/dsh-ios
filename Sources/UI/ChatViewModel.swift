@@ -416,7 +416,11 @@ final class ChatViewModel: ObservableObject {
 
     func save() {
         session.updatedAt = Date()
-        store.save(session)
+        // 落盘前修一遍：App 可能在工具执行到一半时被杀掉，
+        // 磁盘上的历史必须始终满足“tool_calls 后面跟着 tool 消息”。
+        var snapshot = session
+        snapshot.messages = ChatHistorySanitizer.sanitize(session.messages)
+        store.save(snapshot)
         refreshSessions()
     }
 
