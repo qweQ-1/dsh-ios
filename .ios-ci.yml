@@ -1,0 +1,25 @@
+# dsh 的 CI 配置：所有工作流都从这里读设置。
+# 说明见 ios-ci-workflows 的 docs/config.md。
+
+workdir: .
+project: Dsh.xcodeproj
+scheme: Dsh
+bundle_id: com.dsh.ios
+display_name: 'dsh'
+generate_command: xcodegen generate && python3 Scripts/sync-test-plans.py
+sync_command: 'true'
+
+toolchain:
+  xcode: '26.6'
+  simulator: iPhone 17 Pro
+  ios: '26.4'
+
+# 只有逻辑测试，没有 UI 测试，所以一份 test_plan 就够。
+build_test:
+  test_plan: Fast
+  accessibility_audit: warn
+
+# 不做 iCloud，也不需要发 TestFlight；unsigned IPA 走独立工作流。
+testflight:
+  entitlement_mode: none
+  acceptance_issue: false

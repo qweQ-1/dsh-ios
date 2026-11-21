@@ -1,0 +1,81 @@
+# 打一个不签名的 IPA，供 AltStore / Sideloadly / 轻松签 等工具用免费 Apple ID 自签安装。
+# 触发：Actions → Unsigned IPA → Run workflow。
+name: Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Resources/**'
+      - 'project.yml'
+      - '.github/workflows/unsigned-ipa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.6'
+
+      - name: Install pinned XcodeGen
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -oq "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Generate project
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen --version
+          xcodegen generate
+          python3 Scripts/sync-test-plans.py
+
+      - name: Archive without signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild archive -project Dsh.xcodeproj -scheme Dsh \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Dsh.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            2>&1 | tail -40
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP=$(find build/Dsh.xcarchive/Products/Applications -maxdepth 1 -name '*.app' -type d -print -quit)
+          test -n "$APP" || { echo "❌ 没找到 .app"; exit 1; }
+          echo "app: $APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist"
+          test -x "$APP/Dsh" || { echo "❌ bundle 里没有可执行文件 Dsh"; exit 1; }
+          mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          codesign --force --sign - "dist/Payload/$(basename "$APP")" || true
+          (cd dist && zip -qry Dsh-unsigned.ipa Payload)
+          shasum -a 256 dist/Dsh-unsigned.ipa
+          ls -lh dist/
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-unsigned-ipa
+          path: dist/Dsh-unsigned.ipa
+          if-no-files-found: error

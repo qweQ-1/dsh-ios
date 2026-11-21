@@ -1,0 +1,107 @@
+# project.yml
+# dsh for iOS —— XcodeGen 工程定义
+#
+# 用法（Mac 本机）：
+#   brew install xcodegen && xcodegen generate && open Dsh.xcodeproj
+#
+# CI：由 .github/workflows/{build-test,unsigned-ipa}.yml 负责，
+#     走 wenjinliuu/ios-ci-workflows，配置见 .ios-ci.yml。
+#
+# 设计要点：
+#   - 手写 Info.plist（GENERATE_INFOPLIST_FILE=NO）；
+#   - 零第三方依赖（没有 SPM / Podfile）；
+#   - 最低 iOS 16.0，Swift 5.9，并发检查 minimal；
+#   - .xcodeproj 不进仓库，测试计划用 Fast.xctestplan +
+#     Scripts/sync-test-plans.py 在生成后回填 target ID。
+
+name: Dsh
+
+options:
+  bundleIdPrefix: com.dsh
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  groupSortPosition: top
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    ALWAYS_SEARCH_USER_PATHS: NO
+    CLANG_ENABLE_MODULES: YES
+
+targets:
+  # ---------------------------------------------------------------- 主 App
+  Dsh:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources
+      - path: Resources/Info.plist
+        buildPhase: none
+    settings:
+      base:
+        PRODUCT_NAME: Dsh
+        PRODUCT_BUNDLE_IDENTIFIER: com.dsh.ios
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_EMIT_LOC_STRINGS: NO
+        # 没有 Assets.xcassets：侧载安装不受影响，上架 App Store 再补图标。
+      configs:
+        Debug:
+          ENABLE_TESTABILITY: YES
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+
+  # ---------------------------------------------------------------- 单元测试
+  # 只测纯逻辑：分词、语法、路径、命令、ANSI、设置持久化。
+  # 不依赖模拟器 UI，跑得快也不会因动画时序 flaky。
+  DshTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Dsh
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dsh.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+schemes:
+  Dsh:
+    build:
+      targets:
+        Dsh: all
+        DshTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      testPlans:
+        - path: Fast.xctestplan
+          defaultPlan: true
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
