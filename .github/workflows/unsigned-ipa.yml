@@ -73,9 +73,37 @@ jobs:
           shasum -a 256 dist/Dsh-unsigned.ipa
           ls -lh dist/
 
-      - name: Upload IPA
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: dsh-unsigned-ipa
           path: dist/Dsh-unsigned.ipa
           if-no-files-found: error
+
+      # 直接发到 Releases：固定 tag dsh-latest，asset 同名覆盖。
+      # 下载地址（可直接在 iPhone Safari 打开）：
+      #   https://github.com/qweQ-1/dsh-ios/releases/download/dsh-latest/Dsh-unsigned.ipa
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NOTES=$(cat <<'EOF'
+          **dsh for iOS — DeepSeek Harness 原生客户端（未签名 IPA）**
+
+          - DeepSeek API 流式对话 + 工具循环（读写文件 / 沙盒 shell / 抓网页 / todo）
+          - 写操作审批 + Plan mode + 会话持久化
+          - 用 AltStore / Sideloadly / 轻松签 自签安装，需要自备 DeepSeek API Key
+
+          构建：GitHub Actions `Unsigned IPA`，Xcode 26.6，iOS 16+，arm64。
+          EOF
+          )
+          if gh release view dsh-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload dsh-latest dist/Dsh-unsigned.ipa --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create dsh-latest dist/Dsh-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "dsh for iOS · unsigned IPA" \
+              --notes "$NOTES"
+          fi
+          echo "https://github.com/$GITHUB_REPOSITORY/releases/download/dsh-latest/Dsh-unsigned.ipa"
