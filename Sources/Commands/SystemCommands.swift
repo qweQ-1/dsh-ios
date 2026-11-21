@@ -1,9 +1,9 @@
 import Foundation
-import UIKit
 
 enum SystemInfo {
     static var osVersion: String {
-        "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "iOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
     }
 
     static var machine: String {
@@ -15,23 +15,8 @@ enum SystemInfo {
         }
     }
 
-    static var screen: String {
-        let bounds = UIScreen.main.bounds
-        return "\(Int(bounds.width))×\(Int(bounds.height)) @\(Int(UIScreen.main.scale))x"
-    }
-
-    static var battery: String {
-        UIDevice.current.isBatteryMonitoringEnabled = true
-        let level = UIDevice.current.batteryLevel
-        let percent = level < 0 ? "未知" : "\(Int(level * 100))%"
-        let state: String
-        switch UIDevice.current.batteryState {
-        case .charging: state = "充电中"
-        case .full: state = "已充满"
-        case .unplugged: state = "使用电池"
-        default: state = "未知"
-        }
-        return "\(percent)（\(state)）"
+    static var powerState: String {
+        ProcessInfo.processInfo.isLowPowerModeEnabled ? "省电模式" : "正常"
     }
 
     static var disk: (free: String, total: String) {
@@ -76,7 +61,7 @@ struct UnameCommand: ShellCommand {
         if all || parsed.has("n") { parts.append(ctx.shell.hostname) }
         if all || parsed.has("r") { parts.append("24.0.0") }
         if all || parsed.has("m") { parts.append(SystemInfo.machine) }
-        if all { parts.append("iOS \(UIDevice.current.systemVersion)") }
+        if all { parts.append(SystemInfo.osVersion) }
         return .out(parts.joined(separator: " ") + "\n")
     }
 }
@@ -96,7 +81,8 @@ struct DateCommand: ShellCommand {
 
     static func format(_ pattern: String, date: Date) -> String {
         let calendar = Calendar.current
-        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .weekday, .dayOfYear], from: date)
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .weekday], from: date)
+        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
         let monthNames = ["January", "February", "March", "April", "May", "June",
                           "July", "August", "September", "October", "November", "December"]
         let weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -137,7 +123,7 @@ struct DateCommand: ShellCommand {
             case "a": result += String(weekdayNames[weekday].prefix(3))
             case "B": result += monthNames[month - 1]
             case "b": result += String(monthNames[month - 1].prefix(3))
-            case "j": result += String(format: "%03d", comps.dayOfYear ?? 1)
+            case "j": result += String(format: "%03d", dayOfYear)
             case "Z": result += zone.abbreviation(for: date) ?? ""
             case "z": result += offsetText
             case "s": result += String(Int(date.timeIntervalSince1970))
@@ -428,10 +414,9 @@ struct NeofetchCommand: ShellCommand {
             "\(ctx.shell.vars["USER"] ?? "dsh")@\(ctx.shell.hostname)",
             "-----------------",
             "OS: \(SystemInfo.osVersion) \(SystemInfo.machine)",
-            "Host: \(UIDevice.current.model)",
+            "Host: \(SystemInfo.machine)",
             "Shell: dsh 1.0.0",
-            "Screen: \(SystemInfo.screen)",
-            "Battery: \(SystemInfo.battery)",
+            "Power: \(SystemInfo.powerState)",
             "Disk: \(disk.free) free / \(disk.total)",
             "CWD: \(ctx.cwd)"
         ]
