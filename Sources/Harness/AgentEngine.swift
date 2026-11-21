@@ -35,7 +35,10 @@ final class AgentEngine {
              approval: @escaping (ToolCall) async -> Bool,
              emit: @escaping (AgentUpdate) -> Void) async -> [ChatMessage] {
 
-        var messages = history
+        // 进来先修一次：旧版本可能在中断时留下“有 tool_calls 但没有 tool 消息”的历史。
+        // UI 上的 ⚠️ 报错气泡也不再回传给模型。
+        let cleanHistory = history.filter { !($0.role == .assistant && $0.isError) }
+        var messages = ChatHistorySanitizer.sanitize(cleanHistory)
         let tools = ToolCatalog.definitions(planMode: planMode)
         executor.planMode = planMode
         let system = ChatMessage(role: .system, content: systemPrompt)
@@ -128,11 +131,18 @@ final class AgentEngine {
                 return messages
             }
 
-            for call in final.toolCalls {
+            for (offset, call) in final.toolCalls.enumerated() {
                 if Task.isCancelled {
-                    let note = ChatMessage(role: .assistant, content: "（已停止，未执行剩余工具调用。）")
-                    messages.append(note)
-                    emit(.assistantCommitted(note))
+                    // 已经提交了 assistant(tool_calls)，剩下每个 call 都必须补一条 tool 消息，
+                    // 否则这一轮历史永远发不出去（DeepSeek 会 400）。
+                    for remaining in final.toolCalls[offset...] {
+                        let missing = ToolResult.fail(ChatHistorySanitizer.missingResult)
+                        messages.append(ChatMessage(role: .tool,
+                                                    content: missing.output,
+                                                    toolCallID: remaining.id))
+                        emit(.toolFinished(remaining, missing))
+                    }
+                    emit(.notice("已停止。"))
                     return messages
                 }
 
