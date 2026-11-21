@@ -6,7 +6,6 @@ struct ChatScreen: View {
     @StateObject private var vm: ChatViewModel
     @ObservedObject private var settings: SettingsStore
     @State private var showSessions = false
-    @State private var showSettings = false
     @State private var showFiles = false
 
     init(settings: SettingsStore) {
@@ -35,14 +34,14 @@ struct ChatScreen: View {
                     errorBar(error)
                 }
                 Composer(vm: vm, settings: settings) {
-                    showSettings = true
+                    vm.showSettings = true
                 }
             }
         }
         .sheet(isPresented: $showSessions) {
             SessionsSheet(vm: vm)
         }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: $vm.showSettings) {
             SettingsScreen(settings: settings, vm: vm)
         }
         .sheet(isPresented: $showFiles) {
@@ -100,7 +99,7 @@ struct ChatScreen: View {
                 .accessibilityLabel("会话历史")
 
                 Button {
-                    showSettings = true
+                    vm.showSettings = true
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 15, weight: .medium))
